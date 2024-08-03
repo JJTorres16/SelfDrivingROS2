@@ -1,4 +1,0 @@
-[console_scripts]
-simple_parameter = bumperbot_py_examples.simple_parameters:main
-simple_turtlesim_kinematics = bumperbot_py_examples.simple_turtlesim_kinematics:main
-

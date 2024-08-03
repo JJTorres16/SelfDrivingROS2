@@ -12,18 +12,13 @@ controller_manager:
     bumperbot_controller:
       type: diff_drive_controller/DiffDriveController
 
-simple_velocity_controller:
-  ros__parameters:
-    joints:
-      - wheel_left_joint
-      - wheel_right_joint
-
 bumperbot_controller:
-  ross__parameters:
+  ros__parameters:
     type: diff_drive_controller/DiffDriveController
     use_stamped_vel: true
     left_wheel_names: ['wheel_left_joint']
     right_wheel_names: ['wheel_right_joint']
+
     publish_rate: 50.0
     pose_covariance_diagonal: [0.001, 0.001, 1.0e-3, 1.0e-3, 1.0e-3, 0.01]
     twsit_covariance_diagonal: [0.001, 0.001, 1.0e-3, 1.0e-3, 1.0e-3, 0.01]
@@ -31,3 +26,39 @@ bumperbot_controller:
     # Configure the diff_drive controller
     wheel_radius: 0.033
     wheel_separation: 0.17
+    left_wheel_radius_multiplier: 1.0
+    rigth_wheel_radius_multiplier: 1.0
+    wheel_separation_multiplier: 1.0
+
+    cmd_vel_timeot: 0.25
+    base_frame_id: base_footprint
+    publish_limited_velocity: true
+    publish_wheel_data: true
+    enable_odom_tf: true
+
+    linear:
+      x:
+        has_velocity_limits: true
+        max_velocity: 1.0
+        min_velocity: -0.5
+        has_aceleration_limits: true
+        max_aceleration: 0.8
+        min_aceleration: -0.4
+        has_jerk_limits: false
+
+    angular:
+      z:
+        has_velocity_limits: true
+        max_velocity: 1.7
+        min_velocity: -1.7
+        has_aceleration_limits: true
+        max_aceleration: 1.5
+        min_aceleration: -1.5
+        has_jerk_limits: false
+
+
+simple_velocity_controller:
+  ros__parameters:
+    joints:
+      - wheel_left_joint
+      - wheel_right_joint
