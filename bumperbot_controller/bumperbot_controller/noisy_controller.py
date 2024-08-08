@@ -3,9 +3,8 @@
 import rclpy
 import numpy as np
 from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import TwistStamped, TransformStamped
+from geometry_msgs.msg import TransformStamped
 from rclpy.time import Time
 from rclpy.constants import S_TO_NS
 from nav_msgs.msg import Odometry
@@ -13,9 +12,9 @@ import math
 from tf_transformations import quaternion_from_euler
 from tf2_ros import TransformBroadcaster
 
-class SimpleControllerNode(Node):
+class NoisyControllerNode(Node):
     def __init__(self):
-        super().__init__("simple_controller")
+        super().__init__("noisy_controller")
 
         self.declare_parameter("wheel_radius", 0.033)
         self.declare_parameter("wheel_separation", 0.17)
@@ -34,17 +33,13 @@ class SimpleControllerNode(Node):
         self.y_ = 0.0 # The current value of the y coordinates of the robot. This variable will update any time that recibes a mesegge from joint_states
         self.theta_ = 0.0
 
-        self.wheel_command_pub_ = self.create_publisher(Float64MultiArray, "/simple_velocity_controller/commands", 10)
-        self.velocity_sub_ = self.create_subscription(TwistStamped, "bumperbot_controller/cmd_vel", self.velCallback, 10)
         self.joint_sub_ = self.create_subscription(JointState, "joint_states", self.jointCallback, 10) # What this topic does?
-        self.odom_pub_ = self.create_publisher(Odometry, "bumperbot_controller/odom", 10)
-
-        self.speed_conversion_ = np.array([[self.wheel_radius_/2, self.wheel_radius_/2], 
-                                           [self.wheel_radius_/self.wheel_separation_, -self.wheel_radius_/self.wheel_separation_]])
+        # Change the topic where to public in order to run the simple controller and the noisy controller simultaneously
+        self.odom_pub_ = self.create_publisher(Odometry, "bumperbot_controller/odom_noisy", 10)
         
         self.odom_msg_ = Odometry()
         self.odom_msg_.header.frame_id = "odom" # The name of the frame that robot use to express it movement (reference)
-        self.odom_msg_.child_frame_id = "base_footprint"
+        self.odom_msg_.child_frame_id = "base_footprint_ekf"
         self.odom_msg_.pose.pose.orientation.x = 0.0
         self.odom_msg_.pose.pose.orientation.y = 0.0
         self.odom_msg_.pose.pose.orientation.z = 0.0
@@ -53,26 +48,15 @@ class SimpleControllerNode(Node):
         self.broadcaster_ = TransformBroadcaster(self)
         self.transform_stamped_ = TransformStamped()
         self.transform_stamped_.header.frame_id = "odom"
-        self.transform_stamped_.child_frame_id = "base_footprint"
+        self.transform_stamped_.child_frame_id = "base_footprint_noisy"
         
-        self.get_logger().info("The convertion matrix is: %s" % self.speed_conversion_)
-
-    def velCallback(self, msg):
-        # Calculate the velocity of the wheels from the linear velocity
-        robot_speed = np.array([[msg.twist.linear.x],
-                                [msg.twist.angular.z]]) # Now, we have in invert the speed_conversion_ matrix in order to get the angular velocity
-                                                       # of the wheels
-
-        wheel_speed = np.matmul(np.linalg.inv(self.speed_conversion_), robot_speed) # In this array are the angular velocities of the two wheels
-                                                                                    # np.matmul to multiply arrays
-
-        wheel_speed_msg = Float64MultiArray()
-        wheel_speed_msg.data = [wheel_speed[1, 0], wheel_speed[0, 0]]
-        self.wheel_command_pub_.publish(wheel_speed_msg)
 
     def jointCallback(self, msg):
-        dp_left =  msg.position[1] - self.left_wheel_prev_pos_ # msg.position[1] -> Postition of the left wheel and the current moment
-        dp_right =  msg.position[0] - self.right_wheel_prev_pos_ # msg.position[0] -> Postition of the right wheel and the current moment
+        # Add noise to the reading
+        wheel_encoder_left_ = msg.position[1] + np.random.normal(0, 0.005)
+        wheel_encoder_right = msg.position[0] + np.random.normal(0, 0.005)
+        dp_left =  wheel_encoder_left_ - self.left_wheel_prev_pos_ # msg.position[1] -> Postition of the left wheel and the current moment
+        dp_right =  wheel_encoder_right - self.right_wheel_prev_pos_ # msg.position[0] -> Postition of the right wheel and the current moment
         dt = Time.from_msg(msg.header.stamp) - self.prev_time_ # msg.header.stamp -> current time. Time() to convert in a time object 
 
         self.left_wheel_prev_pos_ = msg.position[1]
@@ -123,7 +107,7 @@ class SimpleControllerNode(Node):
 
 def main(args=None):
     rclpy.init()
-    node = SimpleControllerNode()
+    node = NoisyControllerNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
